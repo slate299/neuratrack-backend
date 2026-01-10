@@ -34,4 +34,12 @@ app.use("/api/seizures", seizureRoutes);
 const medicationRoutes = require("./routes/medication.routes");
 app.use("/api/medications", medicationRoutes);
 
+// Emergency routes
+const emergencyRoutes = require("./routes/emergency.routes");
+app.use("/api/emergency", emergencyRoutes);
+
+// AI routes
+const aiRoutes = require("./routes/ai.routes");
+app.use("/api/ai", authMiddleware, aiRoutes);
+
 module.exports = app;
