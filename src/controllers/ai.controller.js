@@ -1,18 +1,30 @@
 // src/controllers/ai.controller.js
-const { parseSeizureNotes } = require("../services/ai.service");
+const aiService = require('../services/ai.service');
 
-exports.handleSeizureNotes = async (req, res) => {
-  const { notes } = req.body;
-
-  if (!notes) {
-    return res.status(400).json({ error: "Notes are required." });
-  }
-
+exports.parseSeizureNote = async (req, res) => {
   try {
-    const analysis = await parseSeizureNotes(notes);
-    res.json(analysis);
+    const { noteText } = req.body;
+    
+    if (!noteText || noteText.length < 5) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Note text must be at least 5 characters' 
+      });
+    }
+    
+    const parsed = await aiService.parseSeizureNote(noteText);
+    
+    res.json({
+      success: true,
+      parsed,
+      originalNote: noteText
+    });
+    
   } catch (error) {
-    console.error("AI analysis failed:", error);
-    res.status(500).json({ error: "AI analysis failed." });
+    console.error('AI parsing error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to parse seizure note' 
+    });
   }
 };
