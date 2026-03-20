@@ -1,4 +1,4 @@
-//src/app.js
+// src/app.js
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
@@ -38,8 +38,8 @@ app.use("/api/medications", medicationRoutes);
 const emergencyRoutes = require("./routes/emergency.routes");
 app.use("/api/emergency", emergencyRoutes);
 
-// AI routes
+// AI routes - FIXED: removed authMiddleware from here
 const aiRoutes = require("./routes/ai.routes");
-app.use("/api/ai", authMiddleware, aiRoutes);
+app.use("/api/ai", aiRoutes);
 
 module.exports = app;
