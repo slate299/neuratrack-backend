@@ -1,4 +1,5 @@
-//src/routes/seizure.routes.js
+// src/routes/seizure.routes.js
+
 const express = require("express");
 const router = express.Router();
 const seizureController = require("../controllers/seizure.controller");
@@ -16,5 +17,14 @@ router.get("/", seizureController.getSeizures);
 
 // Get seizure summary
 router.get("/summary", seizureController.getSeizureSummary);
+
+// Get single seizure by ID
+router.get("/:id", seizureController.getSeizureById);
+
+// Update seizure by ID
+router.put("/:id", seizureController.updateSeizure);
+
+// Delete seizure by ID
+router.delete("/:id", seizureController.deleteSeizure);
 
 module.exports = router;
