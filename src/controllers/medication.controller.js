@@ -1,15 +1,18 @@
-//src/controllers/medication.controller.js
+// src/controllers/medication.controller.js
+
 const prisma = require("../utils/prisma");
 
 // Add medication
 exports.addMedication = async (req, res) => {
-  const { name, dosage, frequency } = req.body;
+  const { name, dosage, frequency, times, startDate, endDate, notes, active } =
+    req.body;
 
   // Basic validation
   if (!name || !dosage || !frequency) {
-    return res
-      .status(400)
-      .json({ message: "Name, dosage, and frequency are required." });
+    return res.status(400).json({
+      success: false,
+      message: "Name, dosage, and frequency are required.",
+    });
   }
 
   try {
@@ -18,14 +21,23 @@ exports.addMedication = async (req, res) => {
         name,
         dosage,
         frequency,
+        times: times || null,
+        startDate: startDate ? new Date(startDate) : new Date(),
+        endDate: endDate ? new Date(endDate) : null,
+        notes: notes || null,
+        active: active !== undefined ? active : true,
         userId: req.user.id,
       },
     });
 
-    res.status(201).json({ message: "Medication added", medication });
+    res.status(201).json({
+      success: true,
+      message: "Medication added",
+      data: medication,
+    });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
@@ -37,9 +49,224 @@ exports.getMedications = async (req, res) => {
       orderBy: { createdAt: "desc" },
     });
 
-    res.json({ medications });
+    res.json({
+      success: true,
+      data: medications,
+    });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// Get single medication by ID
+exports.getMedicationById = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const medication = await prisma.medication.findFirst({
+      where: {
+        id: parseInt(id),
+        userId: req.user.id,
+      },
+    });
+
+    if (!medication) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Medication not found" });
+    }
+
+    res.json({ success: true, data: medication });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// Update medication
+exports.updateMedication = async (req, res) => {
+  const { id } = req.params;
+  const { name, dosage, frequency, times, startDate, endDate, notes, active } =
+    req.body;
+
+  try {
+    const existing = await prisma.medication.findFirst({
+      where: {
+        id: parseInt(id),
+        userId: req.user.id,
+      },
+    });
+
+    if (!existing) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Medication not found" });
+    }
+
+    const updateData = {};
+    if (name !== undefined) updateData.name = name;
+    if (dosage !== undefined) updateData.dosage = dosage;
+    if (frequency !== undefined) updateData.frequency = frequency;
+    if (times !== undefined) updateData.times = times;
+    if (startDate !== undefined) updateData.startDate = new Date(startDate);
+    if (endDate !== undefined)
+      updateData.endDate = endDate ? new Date(endDate) : null;
+    if (notes !== undefined) updateData.notes = notes;
+    if (active !== undefined) updateData.active = active;
+
+    const medication = await prisma.medication.update({
+      where: { id: parseInt(id) },
+      data: updateData,
+    });
+
+    res.json({
+      success: true,
+      message: "Medication updated",
+      data: medication,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// Delete medication
+exports.deleteMedication = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const existing = await prisma.medication.findFirst({
+      where: {
+        id: parseInt(id),
+        userId: req.user.id,
+      },
+    });
+
+    if (!existing) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Medication not found" });
+    }
+
+    await prisma.medication.delete({
+      where: { id: parseInt(id) },
+    });
+
+    res.json({ success: true, message: "Medication deleted" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// Get adherence records
+exports.getAdherence = async (req, res) => {
+  const { days = 7 } = req.query;
+  const userId = req.user.id;
+
+  try {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - parseInt(days));
+
+    const adherence = await prisma.medicationAdherence.findMany({
+      where: {
+        userId,
+        scheduledFor: { gte: startDate },
+      },
+      include: {
+        medication: {
+          select: { name: true },
+        },
+      },
+      orderBy: { scheduledFor: "desc" },
+    });
+
+    const total = adherence.length;
+    const taken = adherence.filter((a) => a.status === "taken").length;
+    const missed = adherence.filter((a) => a.status === "missed").length;
+    const pending = adherence.filter((a) => a.status === "pending").length;
+
+    // Calculate current streak
+    let currentStreak = 0;
+    const today = new Date().toDateString();
+    const adherenceByDate = new Map();
+
+    adherence.forEach((a) => {
+      const date = new Date(a.scheduledFor).toDateString();
+      if (!adherenceByDate.has(date)) {
+        adherenceByDate.set(date, { taken: 0, total: 0 });
+      }
+      const dayData = adherenceByDate.get(date);
+      if (a.status === "taken") dayData.taken++;
+      dayData.total++;
+    });
+
+    // Check streak from today backwards
+    let checkDate = new Date();
+    while (true) {
+      const dateStr = checkDate.toDateString();
+      const dayData = adherenceByDate.get(dateStr);
+      if (!dayData || dayData.taken === 0) break;
+      currentStreak++;
+      checkDate.setDate(checkDate.getDate() - 1);
+    }
+
+    res.json({
+      success: true,
+      data: adherence.map((a) => ({
+        id: a.id,
+        medicationId: a.medicationId,
+        medicationName: a.medication.name,
+        scheduledFor: a.scheduledFor,
+        takenAt: a.takenAt,
+        status: a.status,
+      })),
+      summary: {
+        total,
+        taken,
+        missed,
+        pending,
+        adherenceRate: total > 0 ? Math.round((taken / total) * 100) : 0,
+        currentStreak,
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// Mark medication as taken
+exports.markAsTaken = async (req, res) => {
+  const { medicationId, scheduledFor } = req.body;
+  const userId = req.user.id;
+
+  try {
+    const adherence = await prisma.medicationAdherence.upsert({
+      where: {
+        userId_medicationId_scheduledFor: {
+          userId,
+          medicationId: parseInt(medicationId),
+          scheduledFor: new Date(scheduledFor),
+        },
+      },
+      update: {
+        takenAt: new Date(),
+        status: "taken",
+      },
+      create: {
+        userId,
+        medicationId: parseInt(medicationId),
+        scheduledFor: new Date(scheduledFor),
+        takenAt: new Date(),
+        status: "taken",
+      },
+    });
+
+    res.json({ success: true, message: "Medication marked as taken" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };

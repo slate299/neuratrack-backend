@@ -42,15 +42,23 @@ model Seizure {
   userId Int
 }
 
+// prisma/schema.prisma - Update Medication model
+
 model Medication {
   id        Int      @id @default(autoincrement())
   name      String
   dosage    String
   frequency String
+  times     Json?    
+  startDate DateTime @default(now())
+  endDate   DateTime?
+  notes     String?
+  active    Boolean  @default(true)
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt  // This will auto-set on update
+  userId    Int
 
   user   User @relation(fields: [userId], references: [id])
-  userId Int
   
   adherence MedicationAdherence[]
 }
