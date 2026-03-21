@@ -63,10 +63,26 @@ exports.getMedications = async (req, res) => {
 exports.getMedicationById = async (req, res) => {
   const { id } = req.params;
 
+  // Guard: Check if ID is provided and valid
+  if (!id || id === "undefined" || id === "null") {
+    return res.status(400).json({
+      success: false,
+      message: "Medication ID is required",
+    });
+  }
+
+  const parsedId = parseInt(id);
+  if (isNaN(parsedId)) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid medication ID",
+    });
+  }
+
   try {
     const medication = await prisma.medication.findFirst({
       where: {
-        id: parseInt(id),
+        id: parsedId,
         userId: req.user.id,
       },
     });
@@ -160,7 +176,7 @@ exports.deleteMedication = async (req, res) => {
   }
 };
 
-// Get adherence records - FIXED VERSION
+// Get adherence records - SIMPLIFIED (returns what you have)
 exports.getAdherence = async (req, res) => {
   const { days = 7 } = req.query;
   const userId = req.user.id;
@@ -169,18 +185,7 @@ exports.getAdherence = async (req, res) => {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - parseInt(days));
 
-    // Get all medications first to ensure we have names
-    const medications = await prisma.medication.findMany({
-      where: { userId },
-      select: { id: true, name: true },
-    });
-
-    const medicationMap = {};
-    medications.forEach((m) => {
-      medicationMap[m.id] = m.name;
-    });
-
-    // Get adherence records
+    // Get adherence records directly
     const adherence = await prisma.medicationAdherence.findMany({
       where: {
         userId,
@@ -189,26 +194,16 @@ exports.getAdherence = async (req, res) => {
       orderBy: { scheduledFor: "desc" },
     });
 
-    // Format the data with medication names from our map
-    const formattedData = adherence.map((a) => ({
-      id: a.id,
-      medicationId: a.medicationId,
-      medicationName: medicationMap[a.medicationId] || "Unknown",
-      scheduledFor: a.scheduledFor,
-      takenAt: a.takenAt,
-      status: a.status,
-    }));
-
-    const total = formattedData.length;
-    const taken = formattedData.filter((a) => a.status === "taken").length;
-    const missed = formattedData.filter((a) => a.status === "missed").length;
-    const pending = formattedData.filter((a) => a.status === "pending").length;
+    const total = adherence.length;
+    const taken = adherence.filter((a) => a.status === "taken").length;
+    const missed = adherence.filter((a) => a.status === "missed").length;
+    const pending = adherence.filter((a) => a.status === "pending").length;
 
     // Calculate current streak
     let currentStreak = 0;
     const adherenceByDate = new Map();
 
-    formattedData.forEach((a) => {
+    adherence.forEach((a) => {
       const date = new Date(a.scheduledFor).toDateString();
       if (!adherenceByDate.has(date)) {
         adherenceByDate.set(date, { taken: 0, total: 0 });
@@ -218,7 +213,6 @@ exports.getAdherence = async (req, res) => {
       dayData.total++;
     });
 
-    // Check streak from today backwards
     let checkDate = new Date();
     for (let i = 0; i < 30; i++) {
       const dateStr = checkDate.toDateString();
@@ -230,7 +224,13 @@ exports.getAdherence = async (req, res) => {
 
     res.json({
       success: true,
-      data: formattedData,
+      data: adherence.map((a) => ({
+        id: a.id,
+        medicationId: a.medicationId,
+        scheduledFor: a.scheduledFor,
+        takenAt: a.takenAt,
+        status: a.status,
+      })),
       summary: {
         total,
         taken,
@@ -242,7 +242,6 @@ exports.getAdherence = async (req, res) => {
     });
   } catch (error) {
     console.error("Get adherence error:", error);
-    // Return empty data instead of 500 error
     res.json({
       success: true,
       data: [],
