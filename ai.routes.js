@@ -1,18 +1,19 @@
-// ai.routes.js
-const express = require('express');
+// src/routes/ai.routes.js
+const express = require("express");
 const router = express.Router();
-const auth = require('./auth.middleware');
-const gemini = require('./gemini');
+const auth = require("./auth.middleware");
+const gemini = require("./gemini");
+const aiController = require("../controllers/ai.controller"); // ADD THIS IMPORT
 
 // POST /api/ai/parse-seizure-note
-router.post('/parse-seizure-note', auth, async (req, res) => {
+router.post("/parse-seizure-note", auth, async (req, res) => {
   try {
     const { noteText } = req.body;
-    
+
     if (!noteText || noteText.length < 5) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Note text must be at least 5 characters' 
+      return res.status(400).json({
+        success: false,
+        error: "Note text must be at least 5 characters",
       });
     }
 
@@ -31,22 +32,36 @@ router.post('/parse-seizure-note', auth, async (req, res) => {
       
       Note: "${noteText}"
     `;
-    
+
     const parsed = await gemini.generateJsonResponse(prompt);
-    
+
     res.json({
       success: true,
       parsed,
-      originalNote: noteText
+      originalNote: noteText,
     });
-    
   } catch (error) {
-    console.error('AI parsing error:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to parse seizure note' 
+    console.error("AI parsing error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to parse seizure note",
     });
   }
 });
+
+// ==================== PHASE B3: TRAINING DATA ====================
+router.get("/training-data", auth, aiController.getTrainingData);
+
+// ==================== PHASE B4: PATTERN PREDICTOR ====================
+router.get("/predict-risk", auth, aiController.predictRisk);
+
+// ==================== PHASE B5: MEDICATION ASSISTANT ====================
+router.get("/medication-insights", auth, aiController.getMedicationInsights);
+router.get("/smart-reminder", auth, aiController.getSmartReminder);
+
+// ==================== PHASE B6: CHAT ASSISTANT ====================
+router.get("/conversations", auth, aiController.getConversations);
+router.get("/conversations/:id", auth, aiController.getConversation);
+router.post("/chat", auth, aiController.chat);
 
 module.exports = router;

@@ -1,11 +1,36 @@
 // src/routes/emergency.routes.js
 const express = require("express");
-const { triggerEmergency } = require("../controllers/emergency.controller");
-const authMiddleware = require("../middleware/auth.middleware");
-
 const router = express.Router();
+const authMiddleware = require("../middleware/auth.middleware");
+const emergencyController = require("../controllers/emergency.controller");
 
-// POST /api/emergency/alert
-router.post("/alert", authMiddleware, triggerEmergency);
+// ==================== CONTACT ROUTES ====================
+router.get("/contacts", authMiddleware, emergencyController.getContacts);
+router.post("/contacts", authMiddleware, emergencyController.createContact);
+router.put("/contacts/:id", authMiddleware, emergencyController.updateContact);
+router.delete(
+  "/contacts/:id",
+  authMiddleware,
+  emergencyController.deleteContact,
+);
+router.patch(
+  "/contacts/:id/primary",
+  authMiddleware,
+  emergencyController.setPrimaryContact,
+);
+
+// ==================== EMERGENCY EVENT ROUTES ====================
+router.post("/alert", authMiddleware, emergencyController.triggerEmergency);
+router.get("/events", authMiddleware, emergencyController.getEmergencyEvents);
+router.get(
+  "/events/:id",
+  authMiddleware,
+  emergencyController.getEmergencyEvent,
+);
+router.patch(
+  "/events/:id/resolve",
+  authMiddleware,
+  emergencyController.resolveEmergencyEvent,
+);
 
 module.exports = router;

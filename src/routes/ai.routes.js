@@ -26,4 +26,7 @@ router.post("/chat", auth, aiController.chat);
 // GET /api/ai/conversations?limit=20
 router.get("/conversations", auth, aiController.getConversations);
 
+// GET /api/ai/conversations/:id - Get a single conversation
+router.get("/conversations/:id", auth, aiController.getConversation);
+
 module.exports = router;

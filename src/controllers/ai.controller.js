@@ -256,3 +256,39 @@ exports.getConversations = async (req, res) => {
     });
   }
 };
+
+exports.getConversation = async (req, res) => {
+  try {
+    console.log("getConversation called");
+
+    const userId = req.user?.id;
+    const conversationId = parseInt(req.params.id);
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: "User not authenticated",
+      });
+    }
+
+    if (!conversationId) {
+      return res.status(400).json({
+        success: false,
+        error: "Conversation ID required",
+      });
+    }
+
+    const result = await aiService.getConversation(userId, conversationId);
+
+    res.json(result);
+  } catch (error) {
+    console.error("Get conversation error:", error);
+    console.error("Error stack:", error.stack);
+
+    res.status(500).json({
+      success: false,
+      error: "Failed to get conversation",
+      details: error.message,
+    });
+  }
+};

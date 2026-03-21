@@ -31,12 +31,10 @@ class AIService {
   }
 
   async saveParsedSeizure(userId, noteText, parsedData) {
-    // Validate userId
     if (!userId) {
       throw new Error("User ID is required");
     }
 
-    // Calculate occurredAt from parsed timestamp or use current time
     let occurredAt = new Date();
     if (parsedData.timestamp) {
       occurredAt = new Date(parsedData.timestamp);
@@ -50,6 +48,7 @@ class AIService {
         notes: noteText,
         originalNote: noteText,
         aiConfidence: parsedData.confidence,
+        seizureType: parsedData.seizureType,
         triggers: parsedData.triggers || [],
         symptoms: parsedData.symptoms || [],
         postIctalSymptoms: parsedData.postIctalSymptoms || [],
@@ -57,18 +56,14 @@ class AIService {
     });
   }
 
-  // ==================== PHASE B3: TRAINING DATA API ====================
   async getTrainingData(userId, days = 90) {
-    // Validate userId
     if (!userId) {
       throw new Error("User ID is required");
     }
 
-    // Calculate start date
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    // Fetch seizures within date range
     const seizures = await prisma.seizure.findMany({
       where: {
         userId,
@@ -81,14 +76,11 @@ class AIService {
       },
     });
 
-    // Format data for ML training
     const trainingData = seizures.map((seizure) => {
       const date = new Date(seizure.occurredAt);
-
       return {
         id: seizure.id,
         date: seizure.occurredAt,
-        // Features for prediction
         features: {
           hour: date.getHours(),
           dayOfWeek: date.getDay(),
@@ -102,7 +94,6 @@ class AIService {
       };
     });
 
-    // Calculate summary statistics
     const stats = {
       totalSeizures: seizures.length,
       dateRange: {
@@ -122,12 +113,8 @@ class AIService {
     };
   }
 
-  // ==================== HELPER METHODS ====================
-
-  // Helper: Get most common items from array fields
   _getMostCommon(seizures, field) {
     const counts = {};
-
     seizures.forEach((seizure) => {
       const items = seizure[field];
       if (items && Array.isArray(items)) {
@@ -136,24 +123,19 @@ class AIService {
         });
       }
     });
-
     const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
     return sorted.slice(0, 5).map(([item, count]) => ({ item, count }));
   }
 
-  // Helper: Get seizures by hour
   _getHourDistribution(seizures) {
     const distribution = Array(24).fill(0);
-
     seizures.forEach((seizure) => {
       const hour = new Date(seizure.occurredAt).getHours();
       distribution[hour]++;
     });
-
     return distribution.map((count, hour) => ({ hour, count }));
   }
 
-  // Helper: Get seizures by day of week
   _getDayDistribution(seizures) {
     const days = [
       "Sunday",
@@ -165,46 +147,35 @@ class AIService {
       "Saturday",
     ];
     const distribution = Array(7).fill(0);
-
     seizures.forEach((seizure) => {
       const day = new Date(seizure.occurredAt).getDay();
       distribution[day]++;
     });
-
     return distribution.map((count, index) => ({ day: days[index], count }));
   }
 
-  // ==================== PHASE B4: PATTERN PREDICTOR HELPERS ====================
-
-  // Helper: Calculate risk by hour of day
   _calculateHourRisks(seizures) {
     const hourCounts = Array(24).fill(0);
     seizures.forEach((seizure) => {
       const hour = new Date(seizure.occurredAt).getHours();
       hourCounts[hour]++;
     });
-
     const maxCount = Math.max(...hourCounts);
     if (maxCount === 0) return hourCounts.map(() => 0);
-
     return hourCounts.map((count) => count / maxCount);
   }
 
-  // Helper: Calculate risk by day of week
   _calculateDayRisks(seizures) {
     const dayCounts = Array(7).fill(0);
     seizures.forEach((seizure) => {
       const day = new Date(seizure.occurredAt).getDay();
       dayCounts[day]++;
     });
-
     const maxCount = Math.max(...dayCounts);
     if (maxCount === 0) return dayCounts.map(() => 0);
-
     return dayCounts.map((count) => count / maxCount);
   }
 
-  // Helper: Calculate risk from triggers
   _calculateTriggerRisks(seizures) {
     const triggerCounts = {};
     seizures.forEach((seizure) => {
@@ -215,17 +186,14 @@ class AIService {
         });
       }
     });
-
     const totalSeizures = seizures.length;
     const triggerRisks = {};
     for (const [trigger, count] of Object.entries(triggerCounts)) {
       triggerRisks[trigger] = count / totalSeizures;
     }
-
     return triggerRisks;
   }
 
-  // Helper: Calculate recent trend (last 30 days vs previous 30 days)
   _calculateRecentTrend(seizures) {
     const now = new Date();
     const last30Start = new Date();
@@ -242,19 +210,15 @@ class AIService {
     }).length;
 
     if (previous30Count === 0) return 0.1;
-
     const trend = (last30Count - previous30Count) / previous30Count;
-    return Math.max(0, Math.min(0.5, trend / 2)); // Cap between 0 and 0.5
+    return Math.max(0, Math.min(0.5, trend / 2));
   }
 
-  // ==================== PHASE B4: PATTERN PREDICTOR ====================
   async predictRisk(userId, days = 7) {
-    // Validate userId
     if (!userId) {
       throw new Error("User ID is required");
     }
 
-    // Get historical seizures (last 90 days for pattern analysis)
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - 90);
 
@@ -270,7 +234,6 @@ class AIService {
       },
     });
 
-    // If no seizures, return default low risk
     if (seizures.length === 0) {
       const predictions = [];
       for (let i = 0; i < days; i++) {
@@ -291,13 +254,10 @@ class AIService {
       };
     }
 
-    // Calculate patterns from historical data
     const hourRisks = this._calculateHourRisks(seizures);
     const dayRisks = this._calculateDayRisks(seizures);
-    const triggerRisks = this._calculateTriggerRisks(seizures);
     const recentTrend = this._calculateRecentTrend(seizures);
 
-    // Generate predictions for next N days
     const predictions = [];
     const now = new Date();
 
@@ -307,33 +267,22 @@ class AIService {
       const hour = date.getHours();
       const dayOfWeek = date.getDay();
 
-      // Calculate base risk
-      let riskScore = 0.3; // Base risk
-
-      // Add hour risk (if pattern exists)
+      let riskScore = 0.3;
       if (hourRisks[hour]) {
         riskScore += hourRisks[hour] * 0.3;
       }
-
-      // Add day risk
       if (dayRisks[dayOfWeek]) {
         riskScore += dayRisks[dayOfWeek] * 0.3;
       }
-
-      // Add recent trend (if applicable)
       if (recentTrend > 0) {
         riskScore += recentTrend * 0.2;
       }
-
-      // Cap at 0.95
       riskScore = Math.min(riskScore, 0.95);
 
-      // Determine risk level
       let riskLevel = "Low";
       if (riskScore > 0.7) riskLevel = "High";
       else if (riskScore > 0.4) riskLevel = "Medium";
 
-      // Generate factors explanation
       const factors = [];
       if (hourRisks[hour] > 0.3) {
         factors.push(
@@ -349,7 +298,6 @@ class AIService {
         factors.push("Recent increase in seizure frequency");
       }
 
-      // Generate recommendation
       let recommendation = "Continue normal routine";
       if (riskLevel === "High") {
         recommendation =
@@ -390,15 +338,11 @@ class AIService {
     };
   }
 
-  // ==================== PHASE B5: MEDICATION ASSISTANT ====================
-
   async getMedicationInsights(userId) {
-    // Validate userId
     if (!userId) {
       throw new Error("User ID is required");
     }
 
-    // Get user's medications
     const medications = await prisma.medication.findMany({
       where: { userId },
     });
@@ -411,7 +355,6 @@ class AIService {
       };
     }
 
-    // Get adherence data for last 30 days
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -427,7 +370,6 @@ class AIService {
       },
     });
 
-    // Calculate adherence stats per medication
     const insights = [];
 
     for (const med of medications) {
@@ -445,20 +387,14 @@ class AIService {
       const adherenceRate =
         totalDoses > 0 ? Math.round((takenDoses / totalDoses) * 100) : 0;
 
-      // Find patterns in missed doses
       const missedByHour = {};
-      const missedByDay = {};
-
       medRecords
         .filter((a) => a.status === "missed" || a.status === "late")
         .forEach((record) => {
           const hour = new Date(record.scheduledFor).getHours();
-          const day = new Date(record.scheduledFor).getDay();
           missedByHour[hour] = (missedByHour[hour] || 0) + 1;
-          missedByDay[day] = (missedByDay[day] || 0) + 1;
         });
 
-      // Find worst time
       let worstHour = null;
       let maxMissed = 0;
       for (const [hour, count] of Object.entries(missedByHour)) {
@@ -468,7 +404,6 @@ class AIService {
         }
       }
 
-      // Generate insight
       let insight = "";
       let suggestion = "";
       let riskLevel = "Good";
@@ -516,7 +451,6 @@ class AIService {
       });
     }
 
-    // Calculate overall adherence
     const totalRecords = adherenceRecords.length;
     const totalTaken = adherenceRecords.filter(
       (a) => a.status === "taken",
@@ -537,12 +471,10 @@ class AIService {
   }
 
   async getSmartReminder(userId, medicationId = null) {
-    // Validate userId
     if (!userId) {
       throw new Error("User ID is required");
     }
 
-    // Get user's medications
     const whereClause = { userId };
     if (medicationId) {
       whereClause.id = medicationId;
@@ -560,7 +492,6 @@ class AIService {
       };
     }
 
-    // Get recent seizures for pattern analysis
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -573,15 +504,13 @@ class AIService {
       },
     });
 
-    // Calculate peak seizure hours
     const seizureHours = {};
     recentSeizures.forEach((seizure) => {
       const hour = new Date(seizure.occurredAt).getHours();
       seizureHours[hour] = (seizureHours[hour] || 0) + 1;
     });
 
-    // Find the most common seizure hour
-    let peakHour = 9; // Default
+    let peakHour = 9;
     let maxCount = 0;
     for (const [hour, count] of Object.entries(seizureHours)) {
       if (count > maxCount) {
@@ -590,7 +519,6 @@ class AIService {
       }
     }
 
-    // Get adherence history for timing suggestions
     const adherenceRecords = await prisma.medicationAdherence.findMany({
       where: {
         userId,
@@ -607,7 +535,6 @@ class AIService {
         (a) => a.medicationId === med.id,
       );
 
-      // Find most successful time (most taken on time)
       const successByHour = {};
       medRecords
         .filter((a) => a.status === "taken")
@@ -625,12 +552,10 @@ class AIService {
         }
       }
 
-      // Calculate optimal time based on seizure patterns
-      let suggestedHour = peakHour - 1; // 1 hour before common seizure time
+      let suggestedHour = peakHour - 1;
       if (suggestedHour < 0) suggestedHour = 0;
       if (suggestedHour > 23) suggestedHour = 23;
 
-      // If we have successful data, use that instead
       if (bestCount > 0) {
         suggestedHour = bestHour;
       }
@@ -671,7 +596,6 @@ class AIService {
     };
   }
 
-  // Helper: Generate overall recommendations
   _generateMedicationRecommendations(insights, overallAdherence) {
     const recommendations = [];
 
@@ -712,15 +636,9 @@ class AIService {
     return recommendations;
   }
 
-  async generateMedicationInsight(adherenceData) {
-    // This is now implemented in getMedicationInsights above
-    return this.getMedicationInsights(adherenceData?.userId);
-  }
-
   // ==================== PHASE B6: CHAT ASSISTANT ====================
 
   async chat(userId, message) {
-    // Validate userId
     if (!userId) {
       throw new Error("User ID is required");
     }
@@ -729,7 +647,6 @@ class AIService {
       throw new Error("Message must be at least 2 characters");
     }
 
-    // Fetch user's recent data for context
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -754,7 +671,6 @@ class AIService {
       }),
     ]);
 
-    // Calculate adherence rate
     const totalRecords = adherenceRecords.length;
     const takenDoses = adherenceRecords.filter(
       (a) => a.status === "taken",
@@ -762,14 +678,13 @@ class AIService {
     const adherenceRate =
       totalRecords > 0 ? Math.round((takenDoses / totalRecords) * 100) : null;
 
-    // Format data for context
     const seizureSummary =
       recentSeizures.length > 0
         ? recentSeizures.map((s) => ({
             date: s.occurredAt.toISOString().split("T")[0],
-            type: s.type,
             duration: s.duration,
             triggers: s.triggers,
+            type: s.seizureType,
           }))
         : [];
 
@@ -777,9 +692,9 @@ class AIService {
       name: m.name,
       dosage: m.dosage,
       frequency: m.frequency,
+      times: m.times,
     }));
 
-    // Build prompt with user data
     const prompt = `
       You are NeuraTrack AI, a compassionate and knowledgeable epilepsy assistant. 
       Answer the user's question based on their personal health data provided below.
@@ -793,11 +708,9 @@ class AIService {
       - If you detect emergency language (seizure now, injured, etc.), urge them to call emergency services
       
       USER'S DATA:
-      - Recent Seizures (last 30 days): ${JSON.stringify(seizureSummary, null, 2)}
-      - Medications: ${JSON.stringify(medicationSummary, null, 2)}
-      - Medication Adherence Rate: ${
-        adherenceRate !== null ? adherenceRate + "%" : "No data yet"
-      }
+      - Recent Seizures (last 30 days): ${seizureSummary.length > 0 ? JSON.stringify(seizureSummary, null, 2) : "No seizures logged yet"}
+      - Medications: ${medicationSummary.length > 0 ? JSON.stringify(medicationSummary, null, 2) : "No medications added yet"}
+      - Medication Adherence Rate: ${adherenceRate !== null ? adherenceRate + "%" : "No adherence data yet"}
       - Total seizures logged: ${recentSeizures.length} in last 30 days
       
       USER'S QUESTION: "${message}"
@@ -805,10 +718,8 @@ class AIService {
       Respond conversationally, not as JSON. Be helpful and concise.
     `;
 
-    // Call Gemini
     const response = await gemini.generateContent(prompt);
 
-    // Store conversation in database
     const conversation = await prisma.aIConversation.create({
       data: {
         userId,
@@ -818,18 +729,21 @@ class AIService {
           seizuresUsed: recentSeizures.length,
           medicationsUsed: medications.length,
           adherenceUsed: adherenceRate,
+          timestamp: new Date().toISOString(),
         },
       },
     });
 
     return {
       success: true,
-      response,
-      conversationId: conversation.id,
-      usedData: {
-        seizures: recentSeizures.length,
-        medications: medications.length,
-        adherence: adherenceRate,
+      data: {
+        message: {
+          id: conversation.id,
+          role: "assistant",
+          content: response,
+          createdAt: conversation.createdAt.toISOString(),
+        },
+        conversationId: conversation.id,
       },
     };
   }
@@ -843,23 +757,63 @@ class AIService {
       where: { userId },
       orderBy: { createdAt: "desc" },
       take: limit,
-      select: {
-        id: true,
-        query: true,
-        response: true,
-        createdAt: true,
-      },
     });
+
+    const formattedConversations = conversations.map((c) => ({
+      id: c.id,
+      title: c.query.substring(0, 50),
+      lastMessagePreview: c.response.substring(0, 100),
+      updatedAt: c.createdAt.toISOString(),
+      messageCount: 2,
+    }));
 
     return {
       success: true,
-      conversations: conversations.map((c) => ({
-        id: c.id,
-        question: c.query,
-        answer: c.response,
-        timestamp: c.createdAt,
-      })),
-      total: conversations.length,
+      data: formattedConversations,
+    };
+  }
+
+  async getConversation(userId, conversationId) {
+    if (!userId) {
+      throw new Error("User ID is required");
+    }
+
+    const conversation = await prisma.aIConversation.findFirst({
+      where: {
+        id: conversationId,
+        userId,
+      },
+    });
+
+    if (!conversation) {
+      throw new Error("Conversation not found");
+    }
+
+    const messages = [
+      {
+        id: conversation.id,
+        role: "user",
+        content: conversation.query,
+        createdAt: conversation.createdAt.toISOString(),
+      },
+      {
+        id: conversation.id + 1000000,
+        role: "assistant",
+        content: conversation.response,
+        createdAt: conversation.createdAt.toISOString(),
+      },
+    ];
+
+    return {
+      success: true,
+      data: {
+        id: conversation.id,
+        title: conversation.query.substring(0, 50),
+        lastMessagePreview: conversation.response.substring(0, 100),
+        updatedAt: conversation.createdAt.toISOString(),
+        messageCount: 2,
+        messages,
+      },
     };
   }
 }
