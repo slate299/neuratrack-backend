@@ -36,6 +36,7 @@ model Seizure {
   triggers          Json?
   symptoms          Json?
   postIctalSymptoms Json?
+  seizureType       String?   // ADD THIS LINE
 
   user   User @relation(fields: [userId], references: [id])
   userId Int
