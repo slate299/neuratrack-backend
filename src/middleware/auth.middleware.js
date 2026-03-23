@@ -1,38 +1,72 @@
-// src/middleware/auth.middleware.js
+// backend/src/middleware/auth.middleware.js
+
 const jwt = require("jsonwebtoken");
 
+// Input validation helper
+const validateToken = (token) => {
+  if (!token || typeof token !== "string") return false;
+  // Basic JWT format validation (header.payload.signature)
+  const parts = token.split(".");
+  if (parts.length !== 3) return false;
+  // Check each part is not empty
+  if (!parts[0] || !parts[1] || !parts[2]) return false;
+  return true;
+};
+
 const authMiddleware = (req, res, next) => {
-  console.log("Auth middleware called");
-  console.log("Headers:", req.headers);
-
-  const authHeader = req.headers["authorization"];
-  console.log("Auth header:", authHeader);
-
-  if (!authHeader) {
-    console.log("No authorization header");
-    return res.status(401).json({ message: "No token provided" });
+  // Only log in development
+  if (process.env.NODE_ENV !== "production") {
+    console.log("Auth middleware called");
   }
 
-  const token = authHeader.split(" ")[1]; // Bearer <token>
-  console.log("Token:", token);
+  const authHeader = req.headers["authorization"];
 
-  if (!token) {
-    console.log("No token in header");
-    return res.status(401).json({ message: "No token provided" });
+  if (!authHeader) {
+    return res
+      .status(401)
+      .json({ success: false, message: "No token provided" });
+  }
+
+  // Check if it's a Bearer token
+  if (!authHeader.startsWith("Bearer ")) {
+    return res
+      .status(401)
+      .json({ success: false, message: "Invalid token format" });
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  // Validate token format
+  if (!validateToken(token)) {
+    return res
+      .status(401)
+      .json({ success: false, message: "Invalid token format" });
   }
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log("Decoded token:", decoded);
 
-    // Make sure we set req.user properly
+    // Validate decoded has userId
+    if (!decoded || !decoded.userId) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Invalid token payload" });
+    }
+
     req.user = { id: decoded.userId };
-    console.log("req.user set to:", req.user);
-
     next();
   } catch (err) {
-    console.log("Token verification error:", err.message);
-    return res.status(401).json({ message: "Invalid token" });
+    if (err.name === "TokenExpiredError") {
+      return res.status(401).json({ success: false, message: "Token expired" });
+    }
+    if (err.name === "JsonWebTokenError") {
+      return res.status(401).json({ success: false, message: "Invalid token" });
+    }
+
+    console.error("Auth error:", err.message);
+    return res
+      .status(500)
+      .json({ success: false, message: "Authentication error" });
   }
 };
 
