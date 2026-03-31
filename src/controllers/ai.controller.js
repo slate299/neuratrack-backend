@@ -195,7 +195,7 @@ exports.chat = async (req, res) => {
     console.log("chat called");
 
     const userId = req.user?.id;
-    const { message } = req.body;
+    const { message, conversationId } = req.body; // ← ADD conversationId here
 
     if (!userId) {
       return res.status(401).json({
@@ -212,8 +212,9 @@ exports.chat = async (req, res) => {
     }
 
     console.log("User message:", message);
+    console.log("Conversation ID:", conversationId); // ← ADD log for debugging
 
-    const result = await aiService.chat(userId, message);
+    const result = await aiService.chat(userId, message, conversationId); // ← PASS conversationId
 
     res.json(result);
   } catch (error) {

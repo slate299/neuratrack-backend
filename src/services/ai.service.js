@@ -638,7 +638,7 @@ class AIService {
 
   // ==================== PHASE B6: CHAT ASSISTANT ====================
 
-  async chat(userId, message) {
+  async chat(userId, message, conversationId = null) {
     if (!userId) {
       throw new Error("User ID is required");
     }
@@ -696,43 +696,88 @@ class AIService {
     }));
 
     const prompt = `
-      You are NeuraTrack AI, a compassionate and knowledgeable epilepsy assistant. 
-      Answer the user's question based on their personal health data provided below.
-      
-      IMPORTANT GUIDELINES:
-      - Be warm, empathetic, and supportive
-      - Base answers on their actual data when possible
-      - Never give medical advice - always suggest consulting their doctor
-      - If they ask about something not in their data, say so honestly
-      - Keep responses concise (2-4 sentences) but helpful
-      - If you detect emergency language (seizure now, injured, etc.), urge them to call emergency services
-      
-      USER'S DATA:
-      - Recent Seizures (last 30 days): ${seizureSummary.length > 0 ? JSON.stringify(seizureSummary, null, 2) : "No seizures logged yet"}
-      - Medications: ${medicationSummary.length > 0 ? JSON.stringify(medicationSummary, null, 2) : "No medications added yet"}
-      - Medication Adherence Rate: ${adherenceRate !== null ? adherenceRate + "%" : "No adherence data yet"}
-      - Total seizures logged: ${recentSeizures.length} in last 30 days
-      
-      USER'S QUESTION: "${message}"
-      
-      Respond conversationally, not as JSON. Be helpful and concise.
-    `;
+    You are NeuraTrack AI, a compassionate and knowledgeable epilepsy assistant. 
+    Answer the user's question based on their personal health data provided below.
+    
+    IMPORTANT GUIDELINES:
+    - Be warm, empathetic, and supportive
+    - Base answers on their actual data when possible
+    - Never give medical advice - always suggest consulting their doctor
+    - If they ask about something not in their data, say so honestly
+    - Keep responses concise (2-4 sentences) but helpful
+    - If you detect emergency language (seizure now, injured, etc.), urge them to call emergency services
+    
+    USER'S DATA:
+    - Recent Seizures (last 30 days): ${seizureSummary.length > 0 ? JSON.stringify(seizureSummary, null, 2) : "No seizures logged yet"}
+    - Medications: ${medicationSummary.length > 0 ? JSON.stringify(medicationSummary, null, 2) : "No medications added yet"}
+    - Medication Adherence Rate: ${adherenceRate !== null ? adherenceRate + "%" : "No adherence data yet"}
+    - Total seizures logged: ${recentSeizures.length} in last 30 days
+    
+    USER'S QUESTION: "${message}"
+    
+    Respond conversationally, not as JSON. Be helpful and concise.
+  `;
 
     const response = await gemini.generateContent(prompt);
 
-    const conversation = await prisma.aIConversation.create({
-      data: {
-        userId,
-        query: message,
-        response,
-        context: {
-          seizuresUsed: recentSeizures.length,
-          medicationsUsed: medications.length,
-          adherenceUsed: adherenceRate,
-          timestamp: new Date().toISOString(),
+    let conversation;
+
+    if (conversationId) {
+      // Add message to existing conversation
+      // You need to update your schema to support multiple messages per conversation
+      // For now, we'll update the existing record to append the new messages
+      const existing = await prisma.aIConversation.findFirst({
+        where: { id: conversationId, userId },
+      });
+
+      if (existing) {
+        // Update existing conversation by appending new messages
+        conversation = await prisma.aIConversation.update({
+          where: { id: conversationId },
+          data: {
+            query: existing.query + "\n\n[New Query]: " + message,
+            response: existing.response + "\n\n[New Response]: " + response,
+            context: {
+              ...existing.context,
+              messagesAdded: (existing.context?.messagesAdded || 0) + 1,
+              lastMessage: message,
+              lastResponse: response,
+              lastUpdated: new Date().toISOString(),
+            },
+          },
+        });
+      } else {
+        // Conversation not found, create new one
+        conversation = await prisma.aIConversation.create({
+          data: {
+            userId,
+            query: message,
+            response,
+            context: {
+              seizuresUsed: recentSeizures.length,
+              medicationsUsed: medications.length,
+              adherenceUsed: adherenceRate,
+              timestamp: new Date().toISOString(),
+            },
+          },
+        });
+      }
+    } else {
+      // Create new conversation
+      conversation = await prisma.aIConversation.create({
+        data: {
+          userId,
+          query: message,
+          response,
+          context: {
+            seizuresUsed: recentSeizures.length,
+            medicationsUsed: medications.length,
+            adherenceUsed: adherenceRate,
+            timestamp: new Date().toISOString(),
+          },
         },
-      },
-    });
+      });
+    }
 
     return {
       success: true,
@@ -741,7 +786,7 @@ class AIService {
           id: conversation.id,
           role: "assistant",
           content: response,
-          createdAt: conversation.createdAt.toISOString(),
+          createdAt: new Date().toISOString(),
         },
         conversationId: conversation.id,
       },

@@ -1,450 +1,316 @@
-# 🧠 NeuraTrack AI Backend
+# NeuraTrack Backend API
 
-[![Node.js](https://img.shields.io/badge/Node.js-22.x-green.svg)](https://nodejs.org/)
-[![Express](https://img.shields.io/badge/Express-5.x-blue.svg)](https://expressjs.com/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16.x-blue.svg)](https://www.postgresql.org/)
-[![Prisma](https://img.shields.io/badge/Prisma-5.x-2D3748.svg)](https://www.prisma.io/)
-[![Gemini AI](https://img.shields.io/badge/Gemini_AI-2.5_Flash-orange.svg)](https://deepmind.google/technologies/gemini/)
-
-> **AI-Powered Epilepsy Tracking API** | Convert natural language notes to structured data, predict seizure risks, and provide personalized medication insights.
-
----
+The backend API for NeuraTrack - an AI-powered epilepsy management application. Built with Node.js, Express, PostgreSQL, and Prisma.
 
 ## 📋 Table of Contents
 
 - [Overview](#overview)
-- [Features](#features)
 - [Tech Stack](#tech-stack)
-- [API Documentation](#api-documentation)
-- [Getting Started](#getting-started)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
 - [Environment Variables](#environment-variables)
-- [Database Schema](#database-schema)
-- [AI Features](#ai-features)
+- [Database Setup](#database-setup)
+- [Running the Server](#running-the-server)
+- [API Endpoints](#api-endpoints)
+- [Security Features](#security-features)
+- [AI Integration](#ai-integration)
 - [Testing](#testing)
 - [Deployment](#deployment)
-- [Hackathon Submission](#hackathon-submission)
+- [License](#license)
 
----
+## 🧠 Overview
 
-## 🎯 Overview
+NeuraTrack Backend provides RESTful APIs for:
 
-NeuraTrack is a comprehensive healthcare API designed for epilepsy patients and caregivers. It leverages **Google's Gemini AI** to transform how seizure data is captured, analyzed, and understood.
+- User authentication and authorization (JWT)
+- Seizure logging and tracking
+- Medication management and adherence
+- AI-powered seizure note parsing
+- Risk prediction and insights
+- Emergency SOS alerts with Twilio
+- Shareable report links
+- AI chat assistant
 
-**The Problem:** Patients often struggle to log detailed seizure information during post-ictal states, leading to incomplete records.
+## 🛠️ Tech Stack
 
-**The Solution:** Natural language logging + AI-powered structured data extraction + intelligent insights.
-
----
-
-## ✨ Features
-
-### Core Features
-
-- **🔐 JWT Authentication** – Secure user management
-- **📊 Seizure Tracking** – Log and retrieve seizure events
-- **💊 Medication Management** – Track prescriptions and adherence
-- **🚨 Emergency Alerts** – Log emergency events (ethical design)
-
-### AI-Powered Features (Powered by Gemini 2.5 Flash)
-
-- **📝 Seizure Note Parser** – Convert natural language to structured data with confidence scores
-- **📈 Training Data API** – Formatted seizure data for ML visualization
-- **⚠️ Risk Predictor** – 7-day seizure risk forecasts based on historical patterns
-- **💡 Medication Insights** – AI-powered adherence analysis and personalized tips
-- **⏰ Smart Reminders** – Optimal medication timing based on seizure patterns
-- **💬 AI Chat Assistant** – Natural language Q&A about personal health data
-- **📜 Conversation History** – Persistent chat context across sessions
-
----
-
-## 🛠 Tech Stack
-
-| Category           | Technology                          |
+| Technology         | Purpose                             |
 | ------------------ | ----------------------------------- |
-| **Runtime**        | Node.js 22.x                        |
-| **Framework**      | Express 5.x                         |
-| **Database**       | PostgreSQL 16.x                     |
-| **ORM**            | Prisma 5.x                          |
-| **Authentication** | JWT + bcrypt                        |
-| **AI Model**       | Google Gemini 2.5 Flash (free tier) |
-| **Deployment**     | Render.com                          |
+| Node.js            | Runtime environment                 |
+| Express            | Web framework                       |
+| PostgreSQL         | Primary database                    |
+| Prisma             | ORM and database client             |
+| JWT                | Authentication                      |
+| Google Gemini AI   | AI features (seizure parsing, chat) |
+| Twilio             | SMS/WhatsApp emergency alerts       |
+| Helmet             | Security headers                    |
+| Express Rate Limit | API rate limiting                   |
+| Sentry             | Error tracking                      |
 
----
+## 📋 Prerequisites
 
-## 📚 API Documentation
+- Node.js (v18 or higher)
+- PostgreSQL (v14 or higher)
+- npm or yarn
+- Google Gemini API key
+- Twilio account (for SMS/WhatsApp alerts)
+- Sentry account (optional, for error tracking)
 
-### Base URL
+## 🔧 Installation
 
-```
-https://neuratrack-backend.onrender.com
-```
-
-### Authentication
-
-All protected endpoints require a JWT token:
-
-```
-Authorization: Bearer <JWT_TOKEN>
-```
-
-### Endpoints Overview
-
-| Method | Endpoint                      | Description             | Auth |
-| ------ | ----------------------------- | ----------------------- | ---- |
-| `POST` | `/api/auth/register`          | Register new user       | ❌   |
-| `POST` | `/api/auth/login`             | Login and get token     | ❌   |
-| `GET`  | `/api/protected`              | Test auth               | ✅   |
-| `POST` | `/api/seizures`               | Log a seizure           | ✅   |
-| `GET`  | `/api/seizures`               | Get all seizures        | ✅   |
-| `GET`  | `/api/seizures/summary`       | Get seizure summary     | ✅   |
-| `POST` | `/api/medications`            | Add medication          | ✅   |
-| `GET`  | `/api/medications`            | Get medications         | ✅   |
-| `POST` | `/api/emergency/alert`        | Trigger emergency event | ✅   |
-| `POST` | `/api/ai/parse-seizure-note`  | AI note parser          | ✅   |
-| `GET`  | `/api/ai/training-data`       | ML training data        | ✅   |
-| `GET`  | `/api/ai/predict-risk`        | 7-day risk prediction   | ✅   |
-| `GET`  | `/api/ai/medication-insights` | AI medication analysis  | ✅   |
-| `GET`  | `/api/ai/smart-reminder`      | Optimal reminder times  | ✅   |
-| `POST` | `/api/ai/chat`                | AI chat assistant       | ✅   |
-| `GET`  | `/api/ai/conversations`       | Chat history            | ✅   |
-
-### 📖 Detailed Examples
-
-#### AI Note Parser
+1. Clone the repository:
 
 ```bash
-curl -X POST https://neuratrack-backend.onrender.com/api/ai/parse-seizure-note \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "noteText": "Had a seizure this morning around 10am, lasted about 2 minutes, felt confused afterwards. I missed my medication yesterday."
-  }'
-```
-
-#### Risk Prediction
-
-```bash
-curl -X GET "https://neuratrack-backend.onrender.com/api/ai/predict-risk?days=7" \
-  -H "Authorization: Bearer YOUR_TOKEN"
-```
-
-#### AI Chat
-
-```bash
-curl -X POST https://neuratrack-backend.onrender.com/api/ai/chat \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"message": "What triggers my seizures?"}'
-```
-
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-- Node.js 22.x or higher
-- PostgreSQL 16.x
-- Google Gemini API key (free)
-
-### Installation
-
-1. **Clone the repository**
-
-```bash
-git clone https://github.com/slate299/neuratrack-backend.git
+git clone https://github.com/yourusername/neuratrack-backend.git
 cd neuratrack-backend
 ```
 
-2. **Install dependencies**
+2. Install dependencies:
 
 ```bash
 npm install
 ```
 
-3. **Set up environment variables**
+3. Create a `.env` file in the root directory (see [Environment Variables](#environment-variables))
+
+4. Set up the database:
 
 ```bash
-cp .env.example .env
-# Edit .env with your values
-```
-
-4. **Set up database**
-
-```bash
-# Create PostgreSQL database
-createdb neuratrack_dev
-
-# Run migrations
 npx prisma migrate dev --name init
+npx prisma generate
 ```
 
-5. **Start the server**
+5. Start the development server:
 
 ```bash
-# Development mode
+npm run dev
+```
+
+## 🌍 Environment Variables
+
+Create a `.env` file with the following variables:
+
+```env
+# Database
+DATABASE_URL="postgresql://username:password@localhost:5432/neuratrack"
+
+# Authentication
+JWT_SECRET=your_jwt_secret_key
+PORT=5000
+NODE_ENV=development
+
+# AI - Google Gemini
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_MODEL=gemini-2.0-flash
+
+# Twilio (SMS/WhatsApp)
+TWILIO_ACCOUNT_SID=your_account_sid
+TWILIO_AUTH_TOKEN=your_auth_token
+TWILIO_PHONE_NUMBER=+1234567890
+TWILIO_MESSAGING_SERVICE_SID=your_messaging_sid
+TWILIO_WHATSAPP_FROM=whatsapp:+14155238886
+
+# CORS
+ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
+
+# Sentry (Error Tracking)
+SENTRY_DSN=your_sentry_dsn
+```
+
+## 🗄️ Database Setup
+
+### Run Migrations
+
+```bash
+# Create and apply migrations
+npx prisma migrate dev --name init
+
+# Generate Prisma Client
+npx prisma generate
+
+# Open Prisma Studio (visual database browser)
+npx prisma studio
+```
+
+### Database Schema
+
+The database includes the following models:
+
+- **User** - User accounts and authentication
+- **Seizure** - Seizure records with AI confidence
+- **Medication** - User medications with schedules
+- **MedicationAdherence** - Daily adherence tracking
+- **EmergencyContact** - SOS contacts
+- **EmergencyEvent** - SOS event history
+- **AIConversation** - Chat history
+- **ShareableLink** - Expiring report links
+
+## 🚀 Running the Server
+
+```bash
+# Development mode (with auto-reload)
 npm run dev
 
 # Production mode
 npm start
 ```
 
----
+The server will run at `http://localhost:5000`
 
-## 🔐 Environment Variables
+## 📡 API Endpoints
 
-Create a `.env` file in the root directory:
+### Authentication
 
-```env
-# Database
-DATABASE_URL=postgresql://postgres:password@localhost:5432/neuratrack_dev
+| Method | Endpoint             | Description             |
+| ------ | -------------------- | ----------------------- |
+| POST   | `/api/auth/register` | Create new user account |
+| POST   | `/api/auth/login`    | Login and get JWT token |
+| POST   | `/api/auth/refresh`  | Refresh expired token   |
 
-# Authentication
-JWT_SECRET=your_super_secret_key_here
+### Seizures
 
-# Server
-PORT=5000
-NODE_ENV=development
+| Method | Endpoint                | Description               |
+| ------ | ----------------------- | ------------------------- |
+| GET    | `/api/seizures`         | Get all user seizures     |
+| GET    | `/api/seizures/summary` | Get seizure statistics    |
+| POST   | `/api/seizures`         | Create new seizure record |
+| PUT    | `/api/seizures/:id`     | Update seizure            |
+| DELETE | `/api/seizures/:id`     | Delete seizure            |
 
-# AI - Gemini
-GEMINI_API_KEY=your_gemini_api_key_here
-GEMINI_MODEL=gemini-2.5-flash
-```
+### Medications
 
-### Getting a Gemini API Key (Free)
+| Method | Endpoint                          | Description              |
+| ------ | --------------------------------- | ------------------------ |
+| GET    | `/api/medications`                | Get all user medications |
+| POST   | `/api/medications`                | Add new medication       |
+| PUT    | `/api/medications/:id`            | Update medication        |
+| DELETE | `/api/medications/:id`            | Delete medication        |
+| GET    | `/api/medications/adherence`      | Get adherence records    |
+| POST   | `/api/medications/adherence/mark` | Mark dose as taken       |
 
-1. Visit [Google AI Studio](https://aistudio.google.com/)
-2. Sign in with your Google account
-3. Click "Get API Key"
-4. Create a new project or use existing
-5. Copy your key (no credit card required)
+### AI Features
 
----
+| Method | Endpoint                      | Description                                |
+| ------ | ----------------------------- | ------------------------------------------ |
+| POST   | `/api/ai/parse-seizure-note`  | Parse natural language seizure description |
+| GET    | `/api/ai/predict-risk`        | Get seizure risk prediction                |
+| GET    | `/api/ai/medication-insights` | AI insights on medications                 |
+| GET    | `/api/ai/smart-reminder`      | Smart reminder suggestions                 |
+| POST   | `/api/ai/chat`                | Chat with AI assistant                     |
+| GET    | `/api/ai/conversations`       | Get chat history                           |
 
-## 🗄 Database Schema
+### Emergency
 
-```prisma
-model User {
-  id                   Int      @id @default(autoincrement())
-  email                String   @unique
-  password             String
-  name                 String?
-  createdAt            DateTime @default(now())
-  seizures             Seizure[]
-  medications          Medication[]
-  aiConversations      AIConversation[]
-  medicationAdherence  MedicationAdherence[]
-}
+| Method | Endpoint                              | Description            |
+| ------ | ------------------------------------- | ---------------------- |
+| GET    | `/api/emergency/contacts`             | Get emergency contacts |
+| POST   | `/api/emergency/contacts`             | Add emergency contact  |
+| PATCH  | `/api/emergency/contacts/:id/primary` | Set primary contact    |
+| POST   | `/api/emergency/alert`                | Trigger SOS alert      |
 
-model Seizure {
-  id                Int      @id @default(autoincrement())
-  occurredAt        DateTime
-  duration          Int?
-  notes             String?
-  createdAt         DateTime @default(now())
+### Reports
 
-  // AI Fields
-  originalNote      String?
-  aiConfidence      Float?
-  triggers          Json?
-  symptoms          Json?
-  postIctalSymptoms Json?
+| Method | Endpoint                     | Description                    |
+| ------ | ---------------------------- | ------------------------------ |
+| POST   | `/api/reports/share`         | Generate shareable report link |
+| GET    | `/api/reports/links`         | Get user's shareable links     |
+| DELETE | `/api/reports/links/:id`     | Revoke shareable link          |
+| GET    | `/api/reports/shared/:token` | Public report view             |
+| POST   | `/api/reports/email`         | Send report via email          |
 
-  user   User @relation(fields: [userId], references: [id])
-  userId Int
-}
+## 🔒 Security Features
 
-model AIConversation {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  query     String
-  response  String
-  context   Json?
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id])
-}
+| Feature                   | Description                                                |
+| ------------------------- | ---------------------------------------------------------- |
+| **JWT Authentication**    | Stateless authentication with token expiry                 |
+| **Rate Limiting**         | 100 requests per 15 minutes (API), 5 per 15 minutes (auth) |
+| **Helmet.js**             | Secure HTTP headers                                        |
+| **CORS**                  | Restrict allowed origins                                   |
+| **Input Validation**      | Request body validation                                    |
+| **Request Size Limit**    | 10MB maximum payload                                       |
+| **Sentry Error Tracking** | Production error monitoring                                |
 
-model MedicationAdherence {
-  id           Int      @id @default(autoincrement())
-  userId       Int
-  medicationId Int
-  takenAt      DateTime
-  scheduledFor DateTime
-  status       String   // 'taken', 'missed', 'late'
+## 🤖 AI Integration
 
-  user       User       @relation(fields: [userId], references: [id])
-  medication Medication @relation(fields: [medicationId], references: [id])
-}
-```
+### Seizure Note Parsing
 
----
+The AI can extract structured data from natural language notes like:
 
-## 🤖 AI Features Deep Dive
+> "Had a seizure at 3pm today. It lasted about 2 minutes. I was very tired afterward. I think lack of sleep triggered it."
 
-### 1. Seizure Note Parser
+### Risk Prediction
 
-- Uses Gemini 2.5 Flash with JSON mode
-- Extracts: seizure type, duration, triggers, symptoms, timestamp
-- Returns confidence score (0-1)
-- Stores original note for future training
+Predicts seizure risk for the next 7 days based on:
 
-### 2. Risk Predictor
+- Historical patterns by hour and day
+- Recent seizure frequency trends
+- Common triggers
 
-- Analyzes last 90 days of seizure data
-- Calculates hourly and daily risk patterns
-- Factors in recent trends
-- Provides actionable recommendations
+### Smart Reminders
 
-### 3. Medication Assistant
+Suggests optimal medication timing based on:
 
-- Tracks adherence with status (taken/missed/late)
-- Identifies patterns in missed doses
-- Suggests optimal reminder times
-- Generates personalized insights
-
-### 4. Chat Assistant
-
-- RAG (Retrieval-Augmented Generation) architecture
-- Context includes: recent seizures, medications, adherence
-- Stores conversations for continuity
-- Includes medical disclaimers
-
----
+- Current adherence patterns
+- Seizure timing patterns
+- Historical success rates
 
 ## 🧪 Testing
 
-### Using Hoppscotch (Recommended)
+### Test Rate Limiting
 
-1. Open [Hoppscotch](https://hoppscotch.io)
-2. Set method and URL
-3. Add headers (Authorization, Content-Type)
-4. Add body for POST requests
-5. Send and inspect responses
+```javascript
+for (let i = 0; i < 110; i++) {
+  fetch("http://localhost:5000/api/test-rate-limit").then((res) =>
+    console.log(i, res.status),
+  );
+}
+// After 100 requests, returns 429
+```
 
-### Using cURL
+### Test API with cURL
 
 ```bash
 # Login
 curl -X POST http://localhost:5000/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"test@example.com","password":"password123"}'
+  -d '{"email":"user@example.com","password":"password"}'
 
-# Test AI parser
-curl -X POST http://localhost:5000/api/ai/parse-seizure-note \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"noteText":"Had a seizure at 10am lasting 2 minutes"}'
+# Get seizures (with auth token)
+curl http://localhost:5000/api/seizures \
+  -H "Authorization: Bearer YOUR_TOKEN"
 ```
-
----
 
 ## 🚢 Deployment
 
 ### Deploy to Render
 
-1. Push code to GitHub
-2. Connect repository to Render
-3. Add environment variables
-4. Render auto-deploys on push
+1. Push your code to GitHub
+2. Create a new Web Service on Render
+3. Connect your repository
+4. Set environment variables
+5. Use the following settings:
+   - **Build Command:** `npm install && npx prisma generate`
+   - **Start Command:** `npm start`
+   - **Node Version:** 18
 
-### Environment Variables on Render
+### Deploy to Railway
 
-```env
-DATABASE_URL=your_production_postgres_url
-JWT_SECRET=your_secret_key
-GEMINI_API_KEY=your_gemini_key
-GEMINI_MODEL=gemini-2.5-flash
-NODE_ENV=production
-PORT=5000
-```
+1. Install Railway CLI
+2. Run `railway login`
+3. Run `railway init`
+4. Run `railway up`
 
----
+### Production Database
 
-## 🏆 JavaScript AI Build-a-thon 2026 Submission
+Use managed PostgreSQL services:
 
-This project was built for the **Microsoft JavaScript AI Build-a-thon Hack** (March 13-31, 2026).
-
-### Judging Criteria Alignment
-
-| Criteria                     | How We Addressed                                                                           |
-| ---------------------------- | ------------------------------------------------------------------------------------------ |
-| **Depth of AI Integration**  | 4 distinct AI features: note parsing, risk prediction, medication insights, chat assistant |
-| **Technical Implementation** | Full-stack Node.js + React architecture with Prisma ORM and PostgreSQL                     |
-| **Responsible AI Patterns**  | Confidence scores, medical disclaimers, user override options, privacy-first design        |
-| **Solution Value**           | Solves real problem for 50M+ epilepsy patients worldwide                                   |
-| **Innovation & Creativity**  | Natural language seizure logging, AI-powered predictions, RAG chat assistant               |
-
-### AI Builder Journey
-
-- **Gemini 2.5 Flash** (free tier) used for all AI features
-- **Prompt engineering**: Medical-specific prompts with JSON output
-- **Local-first**: Option to run ML models in browser (future)
-
----
-
-## 📁 Project Structure
-
-```
-neuratrack-backend/
-├── prisma/
-│   ├── schema.prisma          # Database schema
-│   └── migrations/            # Migration files
-├── src/
-│   ├── controllers/           # Request handlers
-│   │   ├── auth.controller.js
-│   │   ├── seizure.controller.js
-│   │   ├── medication.controller.js
-│   │   ├── emergency.controller.js
-│   │   └── ai.controller.js
-│   ├── routes/                # API routes
-│   │   ├── auth.routes.js
-│   │   ├── seizure.routes.js
-│   │   ├── medication.routes.js
-│   │   ├── emergency.routes.js
-│   │   └── ai.routes.js
-│   ├── middleware/            # Auth & validation
-│   │   └── auth.middleware.js
-│   ├── services/              # Business logic
-│   │   └── ai.service.js
-│   ├── app.js                 # Express app
-│   └── server.js              # Entry point
-├── gemini.js                  # Gemini AI service
-├── .env                       # Environment variables
-├── package.json
-└── README.md
-```
-
----
-
-## 🤝 Contributing
-
-This project is part of a hackathon submission. For questions or collaboration:
-
-- **GitHub Issues**: Open an issue
-- **Email**: [your-email@example.com]
-
----
+- [Supabase](https://supabase.com)
+- [Neon](https://neon.tech)
+- [Railway PostgreSQL](https://railway.app)
 
 ## 📄 License
 
-ISC License
+MIT License
 
 ---
 
-## 🙏 Acknowledgments
-
-- **Google Gemini AI** for free-tier access
-- **Microsoft JavaScript AI Build-a-thon** for the opportunity
-- **Epilepsy Foundation** for inspiring real-world impact
-
----
-
-## 📬 Contact
-
-**Developer:** slate299  
-**GitHub:** [@slate299](https://github.com/slate299)  
-**Project Link:** [neuratrack-backend](https://github.com/slate299/neuratrack-backend)
-
----
-
-_Built with ❤️ for epilepsy patients everywhere_
+**Built with ❤️ by Natasha Hinga** | [GitHub](https://github.com/slate299)
