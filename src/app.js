@@ -5,6 +5,10 @@ const cors = require("cors");
 const helmet = require("helmet");
 require("dotenv").config();
 const { apiLimiter, authLimiter } = require("./middleware/rateLimiter");
+const { initSentry, Sentry } = require("./config/sentry");
+
+// Initialize Sentry first (returns true if initialized)
+const sentryInitialized = initSentry();
 
 const app = express();
 
@@ -42,6 +46,11 @@ app.use("/api", apiLimiter);
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
+// Sentry request handler - only if Sentry is initialized
+if (sentryInitialized && Sentry && Sentry.Handlers) {
+  app.use(Sentry.Handlers.requestHandler());
+}
+
 // ========== TEST ROUTES ==========
 
 app.get("/", (req, res) => {
@@ -51,6 +60,11 @@ app.get("/", (req, res) => {
 // Test rate limiting endpoint
 app.get("/api/test-rate-limit", (req, res) => {
   res.json({ success: true, message: "This endpoint is rate limited" });
+});
+
+// Test error endpoint (temporary)
+app.get("/api/test-error", (req, res) => {
+  throw new Error("Test error from NeuraTrack backend!");
 });
 
 // ========== ROUTES ==========
@@ -88,6 +102,11 @@ const reportRoutes = require("./routes/report.routes");
 app.use("/api/reports", authMiddleware, reportRoutes);
 
 // ========== ERROR HANDLING ==========
+
+// Sentry error handler - only if Sentry is initialized
+if (sentryInitialized && Sentry && Sentry.Handlers) {
+  app.use(Sentry.Handlers.errorHandler());
+}
 
 // 404 handler
 app.use((req, res) => {

@@ -102,13 +102,20 @@ const setPrimaryContact = async (req, res) => {
 
 // ==================== EMERGENCY EVENTS ====================
 
+// Update the triggerEmergency function in emergency.controller.js
+
 /**
  * Trigger an emergency alert (SOS)
  */
 const triggerEmergency = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { message, location, autoTriggered = false } = req.body || {};
+    const {
+      message,
+      location,
+      autoTriggered = false,
+      contactIds,
+    } = req.body || {};
 
     // Get user info for name
     const user = await prisma.user.findUnique({
@@ -116,21 +123,31 @@ const triggerEmergency = async (req, res) => {
       select: { name: true, email: true },
     });
 
-    // Get emergency contacts
-    const contacts = await emergencyService.getEmergencyContacts(userId);
+    // Get all emergency contacts
+    const allContacts = await emergencyService.getEmergencyContacts(userId);
 
-    if (contacts.length === 0) {
+    // Filter contacts based on selected IDs
+    let contactsToNotify = allContacts;
+    if (contactIds && contactIds.length > 0) {
+      contactsToNotify = allContacts.filter((c) => contactIds.includes(c.id));
+    }
+
+    if (contactsToNotify.length === 0) {
       return res.status(400).json({
         success: false,
-        error: "No emergency contacts added. Please add contacts first.",
+        error:
+          "No emergency contacts selected. Please select at least one contact.",
       });
     }
 
-    // Create emergency event
+    // Create emergency event with notified contacts
     const event = await emergencyService.createEmergencyEvent(userId, message, {
       location,
       autoTriggered,
-      contactsNotified: contacts.map((c) => ({ name: c.name, phone: c.phone })),
+      contactsNotified: contactsToNotify.map((c) => ({
+        name: c.name,
+        phone: c.phone,
+      })),
     });
 
     // Send SMS via Twilio
@@ -139,11 +156,15 @@ const triggerEmergency = async (req, res) => {
       const twilioService = require("../services/twilio.service");
       const userName = user.name || user.email;
 
-      smsResult = await twilioService.sendEmergencyAlert(userName, contacts, {
-        location,
-        message,
-        timestamp: event.createdAt,
-      });
+      smsResult = await twilioService.sendEmergencyAlert(
+        userName,
+        contactsToNotify,
+        {
+          location,
+          message,
+          timestamp: event.createdAt,
+        },
+      );
 
       console.log(
         `📱 SOS SMS sent: ${smsResult.sentCount}/${smsResult.totalCount} successful`,
@@ -157,7 +178,7 @@ const triggerEmergency = async (req, res) => {
       success: true,
       data: {
         eventId: event.id,
-        contactsNotified: contacts.map((c) => ({
+        contactsNotified: contactsToNotify.map((c) => ({
           name: c.name,
           phone: c.phone,
         })),
